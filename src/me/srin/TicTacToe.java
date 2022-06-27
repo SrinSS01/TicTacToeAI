@@ -25,12 +25,12 @@ public class TicTacToe {
     public void play() {
         System.out.println(this);
         do {
-            int index = currentPlayer.play();
+            int index = currentPlayer.play(blankCells);
             cells[index] = currentPlayer.getPlayer();
             blankCells--;
             System.out.println(this);
-//            int winner = checkWinner(index);
-            if (checkWinner(index)) {
+            int winner = checkWinner(index, blankCells);
+            if (winner != 0) {
                 state = State.GAME_OVER;
                 System.out.printf("Player %c wins!\n", currentPlayer.getPlayer());
             } else if (blankCells == 0) {
@@ -51,9 +51,15 @@ public class TicTacToe {
                 cells[6], cells[7], cells[8]
         );
     }
-    private static boolean checkWinner(int index) {
+    private static int checkWinner(int index, int blankCells) {
         int row = index / 3;
         int col = index % 3;
+        int result = 0;
+        if (cells[index] == 'X') {
+            result = blankCells != 0? 2: 1;
+        } else if (cells[index] == 'O') {
+            result = blankCells != 0? -1: -2;
+        }
         if (row == col) {
             int count = 0;
             for (int i = 0; i < 3; i++) {
@@ -62,7 +68,7 @@ public class TicTacToe {
                 }
                 count++;
             }
-            if (count == 3) return true;
+            if (count == 3) return result;
         }
         if (row == 2 - col) {
             int count = 0;
@@ -72,7 +78,7 @@ public class TicTacToe {
                 }
                 count++;
             }
-            if (count == 3) return true;
+            if (count == 3) return result;
         }
         int count = 0;
         for (int i = 0; i < 3; i++) {
@@ -81,7 +87,7 @@ public class TicTacToe {
             }
             count++;
         }
-        if (count == 3) return true;
+        if (count == 3) return result;
         count = 0;
         for (int i = 0; i < 3; i++) {
             if (cells[i * 3 + col] == ' ' || cells[i * 3 + col] != cells[index]) {
@@ -89,60 +95,37 @@ public class TicTacToe {
             }
             count++;
         }
-        return count == 3;
+        return count == 3? result: 0;
     }
 
     static public class Player {
         char player;
+        char opponent;
         Main.Mode mode;
 
         public Player(char player, Main.Mode mode) {
             this.player = player;
+            this.opponent = player == 'X'? 'O': 'X';
             this.mode = mode;
         }
 
-        public int play() {
-            int x = 0, y = 0;
+        public int play(int blankCells) {
             switch (mode) {
                 case EASY -> {
                     System.out.println("Computer is playing (easy)...");
                     return emptyCells.remove(RANDOM.nextInt(emptyCells.size()));
                 }
                 case MEDIUM -> {
-                    int bestScore = -10;
                     System.out.println("Computer is playing (medium)...");
-                    for (int i = 0; i < 9; i++) {
-                        if (cells[i] == ' ') {
-                            cells[i] = player;
-//                            System.out.printf(
-//                                    "+---+---+---+\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n+---+---+---+\n",
-//                                    cells[0], cells[1], cells[2],
-//                                    cells[3], cells[4], cells[5],
-//                                    cells[6], cells[7], cells[8]
-//                            );
-//                            System.out.println("-------------------------------------------------");
-                            int score = minimax(0, i, false);
-//                            System.out.println("-------------------------------------------------");
-                            cells[i] = ' ';
-//                            System.out.printf(
-//                                    "+---+---+---+\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n+---+---+---+\n",
-//                                    cells[0], cells[1], cells[2],
-//                                    cells[3], cells[4], cells[5],
-//                                    cells[6], cells[7], cells[8]
-//                            );
-                            if (score > bestScore) {
-                                bestScore = score;
-                                x = i % 3;
-                                y = i / 3;
-                            }
-                        }
-                    }
+                    int index = findBestMove(blankCells);
+                    emptyCells.remove(Integer.valueOf(index));
+                    return index;
                 }
                 case USER -> {
                     do {
                         System.out.print("Enter position: ");
-                        x = Main.SC.nextInt() - 1;
-                        y = Main.SC.nextInt() - 1;
+                        int x = Main.SC.nextInt() - 1;
+                        int y = Main.SC.nextInt() - 1;
                         Main.SC.nextLine();
                         if (x < 0 || x > 2 || y < 0 || y > 2) {
                             System.out.println("Invalid position!");
@@ -151,66 +134,61 @@ public class TicTacToe {
                             System.out.println("Position already taken!");
                             continue;
                         }
-                        break;
+                        emptyCells.remove(Integer.valueOf(x + y * 3));
+                        return x + y * 3;
                     } while (true);
                 }
+                default -> { return 0; }
             }
-            emptyCells.remove(Integer.valueOf(x + y * 3));
-            return x + y * 3;
         }
-        public int minimax(int depth, int index, boolean isMax) {
-            if (checkWinner(index)) return cells[index] == 'X' ? 10 : -10;
-            boolean isBlankCellPresent = false;
-            for (char cell : cells) {
-                if (cell == ' ') {
-                    isBlankCellPresent = true;
-                    break;
+
+        public int findBestMove(int blankCells) {
+            int bestScore = -Integer.MAX_VALUE;
+            int move = 0;
+            for (int i = 0; i < 9; i++) {
+                if (cells[i] == ' ') {
+                    cells[i] = player;
+                    int score = minimax(0, i, false, blankCells - 1);
+                    cells[i] = ' ';
+                    if (score > bestScore) {
+                        bestScore = score;
+                        move = i;
+                    }
                 }
             }
-            if (!isBlankCellPresent) return 0;
+            return move;
+        }
+
+        public int minimax(int depth, int index, boolean isMax, int blankCell) {
+            int result = checkWinner(index, blankCell);
+            char winner = result < 0? 'O': result > 0? 'X': 0;
+            int resultAbsolute = Math.abs(result);
+            if (winner == player) {
+                return resultAbsolute;
+            } else if (winner == opponent) {
+                return -resultAbsolute;
+            } else if (blankCell == 0) {
+                return 0;
+            }
             else if (isMax) {
-                int best = -10;
+                int best = -Integer.MAX_VALUE;
                 for (int i = 0; i < 9; i++) {
                     if (cells[i] == ' ') {
                         cells[i] = player;
-//                        System.out.printf(
-//                                "+---+---+---+\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n+---+---+---+\n",
-//                                cells[0], cells[1], cells[2],
-//                                cells[3], cells[4], cells[5],
-//                                cells[6], cells[7], cells[8]
-//                        );
-                        int score = minimax(depth + 1, i, false);
+                        int score = minimax(depth + 1, i, false, blankCell - 1);
                         best = Math.max(best, score);
                         cells[i] = ' ';
-//                        System.out.printf(
-//                                "+---+---+---+\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n+---+---+---+\n",
-//                                cells[0], cells[1], cells[2],
-//                                cells[3], cells[4], cells[5],
-//                                cells[6], cells[7], cells[8]
-//                        );
                     }
                 }
                 return best;
             } else {
-                int best = 10;
+                int best = Integer.MAX_VALUE;
                 for (int i = 0; i < 9; i++) {
                     if (cells[i] == ' ') {
-                        cells[i] = player == 'X' ? 'O' : 'X';
-//                        System.out.printf(
-//                                "+---+---+---+\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n+---+---+---+\n",
-//                                cells[0], cells[1], cells[2],
-//                                cells[3], cells[4], cells[5],
-//                                cells[6], cells[7], cells[8]
-//                        );
-                        int score = minimax(depth + 1, i, true);
+                        cells[i] = opponent;
+                        int score = minimax(depth + 1, i, true, blankCell - 1);
                         best = Math.min(best, score);
                         cells[i] = ' ';
-//                        System.out.printf(
-//                                "+---+---+---+\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n|---+---+---|\n| %c | %c | %c |\n+---+---+---+\n",
-//                                cells[0], cells[1], cells[2],
-//                                cells[3], cells[4], cells[5],
-//                                cells[6], cells[7], cells[8]
-//                        );
                     }
                 }
                 return best;
